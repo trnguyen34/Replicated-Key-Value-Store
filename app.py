@@ -9,6 +9,8 @@ KV_STORAGE = {}
 # A set to store the addresses of replicas in the view
 VIEW = set()
 
+# ============== BEGIN VIEW OPERATIONS SECTION =============
+
 @app.route('/view', methods=['PUT'])
 def put_replica():
     # Retrieve JSON data from the request
@@ -44,6 +46,11 @@ def delete_replica():
     # If present, remove the replica from the view
     VIEW.remove(socket_address)
     return jsonify({"result": "deleted"}), 200
+
+# =============== END VIEW OPERATIONS SECTION ==============
+
+# =========== BEGIN KEY-VALUE OPERATIONS SECTION ===========
+# ============ END KEY-VALUE OPERATIONS SECTION ============
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8090, debug=True)
