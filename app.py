@@ -9,7 +9,10 @@ KV_STORAGE = {}
 # A set to store the addresses of replicas in the view
 VIEW = set()
 
-# ============== BEGIN VIEW OPERATIONS SECTION =============
+# A dictionary to store vector clocks
+VECTOR_CLOCKS = {}
+
+# ============== VIEW OPERATIONS SECTION =============
 
 @app.route('/view', methods=['PUT'])
 def put_replica():
@@ -47,9 +50,26 @@ def delete_replica():
     VIEW.remove(socket_address)
     return jsonify({"result": "deleted"}), 200
 
-# =============== END VIEW OPERATIONS SECTION ==============
+# ============== END VIEW OPERATIONS SECTION ===============
 
-# =========== BEGIN KEY-VALUE OPERATIONS SECTION ===========
+
+# ============== KEY-VALUE OPERATIONS SECTION ==============
+
+@app.route('/kvs/<key>', methods=['PUT'])
+def put_kvs(key):
+    data = request.get_json()
+    client_vc = data.get('causal-metadata')
+
+@app.route('/kvs/<key>', methods=['GET'])
+def get_kvs(key):
+    data = request.get_json()
+    client_vc = data.get('causal-metadata')
+
+@app.route('/kvs/<key>', methods=['DELETE'])
+def delete_kvs(key):
+    data = request.get_json()
+    client_vc = data.get('causal-metadata')
+
 # ============ END KEY-VALUE OPERATIONS SECTION ============
 
 if __name__ == "__main__":
