@@ -85,6 +85,27 @@ def put_kvs(key):
     data = request.get_json()
     client_vc = data.get('causal-metadata')
 
+    if client_vc is not None and is_causal_consistency(client_vc, VECTOR_CLOCKS) is False:
+        return jsonify({"error": "Causal dependencies not satisfied; try again later"}), 503
+
+    if 'value' not in data:
+        return jsonify({"error": "PUT request does not specify a value"}), 400
+
+    if len(key) > 50:
+        return jsonify({"error": "Key is too long"}), 400
+
+    if client_vc is None:
+        VECTOR_CLOCKS[SOCKET_ADDRESS] += 1
+
+    value = data['value']
+    if key in KV_STORAGE:
+        KV_STORAGE[key] = value
+        return jsonify({"result": "replaced", "causal-metadata": VECTOR_CLOCKS}), 200
+    else:
+        KV_STORAGE[key] = value
+        return jsonify({"result": "created", "causal-metadata": VECTOR_CLOCKS}), 201
+
+
 @app.route('/kvs/<key>', methods=['GET'])
 def get_kvs(key):
     data = request.get_json()
@@ -118,6 +139,9 @@ def delete_kvs(key):
     return jsonify({"result": "deleted", "causal-metadata": VECTOR_CLOCKS}), 200
 
 # ============ END KEY-VALUE OPERATIONS SECTION =============
+
+#! =============== FOR TESTING PURPOSE ======================
+#! =============== END TESTING PURPOSE ======================
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8090, debug=True)
