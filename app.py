@@ -65,12 +65,38 @@ def get_kvs(key):
     data = request.get_json()
     client_vc = data.get('causal-metadata')
 
+    if client_vc is None or is_causal_consistency(client_vc, VECTOR_CLOCKS):
+        if key in KV_STORAGE:
+            value = KV_STORAGE[key]
+            return jsonify({"result": "found", "value": value, "causal-metadata": VECTOR_CLOCKS}), 200
+        else:
+             return jsonify({"error": "Key does not exist"}), 404
+    else:
+        return jsonify({"error": "Causal dependencies not satisfied; try again later"}), 503
+
 @app.route('/kvs/<key>', methods=['DELETE'])
 def delete_kvs(key):
     data = request.get_json()
     client_vc = data.get('causal-metadata')
 
-# ============ END KEY-VALUE OPERATIONS SECTION ============
+# ============ END KEY-VALUE OPERATIONS SECTION =============
+
+
+# ==================== Utility Functions ====================
+
+# Ensure that the client's vc is less or equal to the to 
+# replica's vc. 
+def is_causal_consistency(client_vc, replica_vc):
+    for client_key in client_vc:
+        if client_key not in replica_vc:
+            return False
+
+        if client_vc[client_key] > replica_vc[client_key]:
+            return False
+        
+    return True
+
+# ================== End Utility Functions ==================
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8090, debug=True)
