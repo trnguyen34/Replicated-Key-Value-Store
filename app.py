@@ -15,7 +15,22 @@ KV_STORAGE = {}
 VIEW = set()
 
 # A dictionary to store vector clocks
-VECTOR_CLOCKS = {}
+VECTOR_CLOCK = {}
+
+# ==================== Replica View and Vector Clock Initialization ====================
+
+# Add the current replica's address 
+VIEW.add(SOCKET_ADDRESS)
+
+# Add all addresses from the VIEW_ADDRESS 
+for addr in VIEW_ADDRESS.split(','):
+    VIEW.add(addr)
+
+# Initialize VECTOR_CLOCK
+for replica in VIEW:
+    VECTOR_CLOCK[replica] = 0
+    
+# ================= Replica View and Vector Clock Initialization ================
 
 # ==================== Utility Functions ====================
 
@@ -50,7 +65,7 @@ def put_replica():
     # If not present, add the new replica address to the view
     VIEW.add(new_socket_address)
     # Add the new replica to the vc and initialize to 0
-    VECTOR_CLOCKS[new_socket_address] = 0
+    VECTOR_CLOCK[new_socket_address] = 0
 
     return jsonify({"result": "added"}), 201
 
@@ -85,7 +100,7 @@ def put_kvs(key):
     data = request.get_json()
     client_vc = data.get('causal-metadata')
 
-    if client_vc is not None and is_causal_consistency(client_vc, VECTOR_CLOCKS) is False:
+    if client_vc is not None and is_causal_consistency(client_vc, VECTOR_CLOCK) is False:
         return jsonify({"error": "Causal dependencies not satisfied; try again later"}), 503
 
     if 'value' not in data:
@@ -95,15 +110,15 @@ def put_kvs(key):
         return jsonify({"error": "Key is too long"}), 400
 
     if client_vc is None:
-        VECTOR_CLOCKS[SOCKET_ADDRESS] += 1
+        VECTOR_CLOCK[SOCKET_ADDRESS] += 1
 
     value = data['value']
     if key in KV_STORAGE:
         KV_STORAGE[key] = value
-        return jsonify({"result": "replaced", "causal-metadata": VECTOR_CLOCKS}), 200
+        return jsonify({"result": "replaced", "causal-metadata": VECTOR_CLOCK}), 200
     else:
         KV_STORAGE[key] = value
-        return jsonify({"result": "created", "causal-metadata": VECTOR_CLOCKS}), 201
+        return jsonify({"result": "created", "causal-metadata": VECTOR_CLOCK}), 201
 
 
 @app.route('/kvs/<key>', methods=['GET'])
@@ -111,10 +126,10 @@ def get_kvs(key):
     data = request.get_json()
     client_vc = data.get('causal-metadata')
 
-    if client_vc is None or is_causal_consistency(client_vc, VECTOR_CLOCKS):
+    if client_vc is None or is_causal_consistency(client_vc, VECTOR_CLOCK):
         if key in KV_STORAGE:
             value = KV_STORAGE[key]
-            return jsonify({"result": "found", "value": value, "causal-metadata": VECTOR_CLOCKS}), 200
+            return jsonify({"result": "found", "value": value, "causal-metadata": VECTOR_CLOCK}), 200
         else:
              return jsonify({"error": "Key does not exist"}), 404
     else:
@@ -126,7 +141,7 @@ def delete_kvs(key):
     client_vc = data.get('causal-metadata')
 
     # The client's vc is NULL or causal consistency has not been met.
-    if client_vc is None or is_causal_consistency(client_vc, VECTOR_CLOCKS) is False:
+    if client_vc is None or is_causal_consistency(client_vc, VECTOR_CLOCK) is False:
         return jsonify({"error": "Causal dependencies not satisfied; try again later"}), 503
 
     if key not in KV_STORAGE:
@@ -134,9 +149,9 @@ def delete_kvs(key):
 
     del KV_STORAGE[key]    
     # Increment the current replica's vc
-    VECTOR_CLOCKS[SOCKET_ADDRESS] += 1
+    VECTOR_CLOCK[SOCKET_ADDRESS] += 1
 
-    return jsonify({"result": "deleted", "causal-metadata": VECTOR_CLOCKS}), 200
+    return jsonify({"result": "deleted", "causal-metadata": VECTOR_CLOCK}), 200
 
 # ============ END KEY-VALUE OPERATIONS SECTION =============
 
