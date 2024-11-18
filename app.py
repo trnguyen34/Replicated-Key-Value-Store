@@ -3,6 +3,11 @@ import requests, os
 
 app = Flask(__name__)
 
+# Corresponds to the current Replica IP address
+SOCKET_ADDRESS = os.environ.get('SOCKET_ADDRESS')
+# The socket address of the replicas participating the key-value store
+VIEW_ADDRESS = os.environ.get('VIEW')
+
 # A dictionary to store key-value pairs 
 KV_STORAGE = {}
 
@@ -11,6 +16,23 @@ VIEW = set()
 
 # A dictionary to store vector clocks
 VECTOR_CLOCKS = {}
+
+# ==================== Utility Functions ====================
+
+# Ensure that the client's vc is less or equal to the to 
+# replica's vc. 
+def is_causal_consistency(client_vc, replica_vc):
+    for client_key in client_vc:
+        if client_key not in replica_vc:
+            return False
+
+        if client_vc[client_key] > replica_vc[client_key]:
+            return False
+        
+    return True
+
+# ================== End Utility Functions ==================
+
 
 # ============== VIEW OPERATIONS SECTION =============
 
@@ -25,8 +47,11 @@ def put_replica():
     if new_socket_address in VIEW:
         return jsonify({"result": "already present"}), 200
 
-    # If not present, add the replica to the view
+    # If not present, add the new replica address to the view
     VIEW.add(new_socket_address)
+    # Add the new replica to the vc and initialize to 0
+    VECTOR_CLOCKS[new_socket_address] = 0
+
     return jsonify({"result": "added"}), 201
 
 @app.route('/view', methods=['GET'])
@@ -79,24 +104,20 @@ def delete_kvs(key):
     data = request.get_json()
     client_vc = data.get('causal-metadata')
 
+    # The client's vc is NULL or causal consistency has not been met.
+    if client_vc is None or is_causal_consistency(client_vc, VECTOR_CLOCKS) is False:
+        return jsonify({"error": "Causal dependencies not satisfied; try again later"}), 503
+
+    if key not in KV_STORAGE:
+        return jsonify({"error": "Key does not exist"}), 404
+
+    del KV_STORAGE[key]    
+    # Increment the current replica's vc
+    VECTOR_CLOCKS[SOCKET_ADDRESS] += 1
+
+    return jsonify({"result": "deleted", "causal-metadata": VECTOR_CLOCKS}), 200
+
 # ============ END KEY-VALUE OPERATIONS SECTION =============
-
-
-# ==================== Utility Functions ====================
-
-# Ensure that the client's vc is less or equal to the to 
-# replica's vc. 
-def is_causal_consistency(client_vc, replica_vc):
-    for client_key in client_vc:
-        if client_key not in replica_vc:
-            return False
-
-        if client_vc[client_key] > replica_vc[client_key]:
-            return False
-        
-    return True
-
-# ================== End Utility Functions ==================
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8090, debug=True)
