@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request
-import requests, os
+import requests, os, time
 
 app = Flask(__name__)
 
@@ -30,7 +30,7 @@ for addr in VIEW_ADDRESS.split(','):
 for replica in VIEW:
     VECTOR_CLOCK[replica] = 0
     
-# ================= Replica View and Vector Clock Initialization ================
+# ================= End of Replica View and Vector Clock Initialization ================
 
 # ==================== Utility Functions ====================
 
@@ -46,6 +46,27 @@ def is_causal_consistency(client_vc, replica_vc):
         
     return True
 
+def add_new_replica(new_socket_address):
+    VIEW.add(new_socket_address)
+    VECTOR_CLOCK[new_socket_address] = 0
+    print(f"Added replica {new_socket_address} to VIEW and initialized VECTOR_CLOCK.", flush=True)
+
+def broadcast_replica_address(new_socket_address):
+    for replica_addr in VIEW:
+        if replica_addr != SOCKET_ADDRESS:
+            url = f"http://{replica_addr}/viewed"
+            json_data = {"socket-address": new_socket_address}
+
+            try:
+                response = requests.put(url, json=json_data, timeout=1.5)
+                if response.status_code in (200, 201):
+                    print(f"Successfully notified {replica_addr} of new replica {new_socket_address}", flush=True)
+                    break
+                else:
+                    print(f"Failed to notify {replica_addr}: {response.status_code}", flush=True)
+            except requests.exceptions.RequestException as e:
+                print(f"Error notifying {replica_addr}: {e}", flush=True)
+                
 # ================== End Utility Functions ==================
 
 
@@ -62,10 +83,8 @@ def put_replica():
     if new_socket_address in VIEW:
         return jsonify({"result": "already present"}), 200
 
-    # If not present, add the new replica address to the view
-    VIEW.add(new_socket_address)
-    # Add the new replica to the vc and initialize to 0
-    VECTOR_CLOCK[new_socket_address] = 0
+    add_new_replica(new_socket_address)
+    broadcast_replica_address(new_socket_address)
 
     return jsonify({"result": "added"}), 201
 
@@ -89,6 +108,21 @@ def delete_replica():
     # If present, remove the replica from the view
     VIEW.remove(socket_address)
     return jsonify({"result": "deleted"}), 200
+
+@app.route('/viewed', methods=['PUT'])
+def put_replica_from_broadcast():
+    # Retrieve JSON data from the request
+    data = request.get_json()
+    # Extract the socket address of the new replica
+    new_socket_address = data.get('socket-address')
+
+    # Check if the replica is already in the view
+    if new_socket_address in VIEW:
+        return jsonify({"result": "already present"}), 200
+
+    add_new_replica(new_socket_address)
+
+    return jsonify({"result": "added"}), 201
 
 # ============== END VIEW OPERATIONS SECTION ===============
 
