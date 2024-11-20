@@ -61,15 +61,22 @@ def broadcast_put_replica(new_socket_address):
             url = f"http://{replica_addr}/viewed"
             json_data = {"socket-address": new_socket_address}
 
+            # Retry until an ack is received
+            # while True:
             try:
                 response = requests.put(url, json=json_data, timeout=1.5)
                 if response.status_code in (200, 201):
-                    print(f"Successfully notified {replica_addr} of new replica {new_socket_address}", flush=True)
-                    break
+                    # print(f"Successfully notified {replica_addr} of new replica {new_socket_address}", flush=True)
+                    # break
+                    continue
                 else:
                     print(f"Failed to notify {replica_addr}: {response.status_code}", flush=True)
             except requests.exceptions.RequestException as e:
                 print(f"Error notifying {replica_addr}: {e}", flush=True)
+
+            # Sleep for 1 second before retrying
+            # print(f"Retrying to notify {replica_addr} of new replica {new_socket_address}...", flush=True)
+            # time.sleep(1)
 
 def broadcast_delete_replica(socket_address):
     for replica_addr in VIEW:
@@ -77,19 +84,21 @@ def broadcast_delete_replica(socket_address):
             url = f"http://{replica_addr}/viewed"
             json_data = {"socket-address": new_socket_address}
 
-            while True:
-                try:
-                    response = requests.delete(url, json=json_data, timeout=1.5)
-                    if response.status_code in (200, 404):
-                        break
-                    else:
-                        print(f"Failed to notify {replica_addr} to delete replica: {response.status_code}", flush=True)
-                except requests.exceptions.RequestException as e:
-                    print(f"Error notifying {replica_addr} to delete replica: {e}", flush=True)
+            # Retry until an ack is received
+            # while True:
+            try:
+                response = requests.delete(url, json=json_data, timeout=1.5)
+                if response.status_code in (200, 404):
+                    # break
+                    continue
+                else:
+                    print(f"Failed to notify {replica_addr} to delete replica: {response.status_code}", flush=True)
+            except requests.exceptions.RequestException as e:
+                print(f"Error notifying {replica_addr} to delete replica: {e}", flush=True)
                 
-                # Sleep for 1 second before retrying
-                print(f"Retrying to notify {replica_addr} to delete replica {socket_address}...", flush=True)
-                time.sleep(1)
+            # Sleep for 1 second before retrying
+            # print(f"Retrying to notify {replica_addr} to delete replica {socket_address}...", flush=True)
+            # time.sleep(1)
                 
 # ================== End Utility Functions ==================
 
@@ -108,6 +117,7 @@ def put_replica():
         return jsonify({"result": "already present"}), 200
 
     add_new_replica(new_socket_address)
+
     broadcast_put_replica(new_socket_address)
 
     return jsonify({"result": "added"}), 201
@@ -133,6 +143,7 @@ def delete_replica():
     VIEW.remove(socket_address)
 
     broadcast_delete_replica(socket_address)
+
     return jsonify({"result": "deleted"}), 200
 
 # ============== END VIEW OPERATIONS SECTION ===============
@@ -160,7 +171,7 @@ def delete_replica_from_broadcast():
     # Retrieve JSON data from the request
     data = request.get_json()
     # Extract the socket address of the new replica
-    new_socket_address = data.get('socket-address')
+    socket_address = data.get('socket-address')
 
     # Check if the replica is in the view
     if socket_address not in VIEW:
