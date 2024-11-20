@@ -47,11 +47,15 @@ def is_causal_consistency(client_vc, replica_vc):
     return True
 
 def add_new_replica(new_socket_address):
+    # Add the new replica's socket address to the VIEW
     VIEW.add(new_socket_address)
+
+    # Initialize the new replica's vector clock entry to 0.
     VECTOR_CLOCK[new_socket_address] = 0
+
     print(f"Added replica {new_socket_address} to VIEW and initialized VECTOR_CLOCK.", flush=True)
 
-def broadcast_replica_address(new_socket_address):
+def broadcast_put_replica(new_socket_address):
     for replica_addr in VIEW:
         if replica_addr != SOCKET_ADDRESS:
             url = f"http://{replica_addr}/viewed"
@@ -66,6 +70,26 @@ def broadcast_replica_address(new_socket_address):
                     print(f"Failed to notify {replica_addr}: {response.status_code}", flush=True)
             except requests.exceptions.RequestException as e:
                 print(f"Error notifying {replica_addr}: {e}", flush=True)
+
+def broadcast_delete_replica(socket_address):
+    for replica_addr in VIEW:
+        if replica_addr != SOCKET_ADDRESS:
+            url = f"http://{replica_addr}/viewed"
+            json_data = {"socket-address": new_socket_address}
+
+            while True:
+                try:
+                    response = requests.delete(url, json=json_data, timeout=1.5)
+                    if response.status_code in (200, 404):
+                        break
+                    else:
+                        print(f"Failed to notify {replica_addr} to delete replica: {response.status_code}", flush=True)
+                except requests.exceptions.RequestException as e:
+                    print(f"Error notifying {replica_addr} to delete replica: {e}", flush=True)
+                
+                # Sleep for 1 second before retrying
+                print(f"Retrying to notify {replica_addr} to delete replica {socket_address}...", flush=True)
+                time.sleep(1)
                 
 # ================== End Utility Functions ==================
 
@@ -84,7 +108,7 @@ def put_replica():
         return jsonify({"result": "already present"}), 200
 
     add_new_replica(new_socket_address)
-    broadcast_replica_address(new_socket_address)
+    broadcast_put_replica(new_socket_address)
 
     return jsonify({"result": "added"}), 201
 
@@ -107,7 +131,14 @@ def delete_replica():
     
     # If present, remove the replica from the view
     VIEW.remove(socket_address)
+
+    broadcast_delete_replica(socket_address)
     return jsonify({"result": "deleted"}), 200
+
+# ============== END VIEW OPERATIONS SECTION ===============
+
+
+# ============== BROADCAST VIEW OPERATIONS SECTION ===============
 
 @app.route('/viewed', methods=['PUT'])
 def put_replica_from_broadcast():
@@ -124,7 +155,24 @@ def put_replica_from_broadcast():
 
     return jsonify({"result": "added"}), 201
 
-# ============== END VIEW OPERATIONS SECTION ===============
+@app.route('/viewed', methods=['DELETE'])
+def delete_replica_from_broadcast():
+    # Retrieve JSON data from the request
+    data = request.get_json()
+    # Extract the socket address of the new replica
+    new_socket_address = data.get('socket-address')
+
+    # Check if the replica is in the view
+    if socket_address not in VIEW:
+         # If not present, respond with an error
+        return jsonify({"error": "View has no such replica"}), 404
+
+    # If present, remove the replica from the view
+    VIEW.remove(socket_address)
+    return jsonify({"result": "deleted"}), 200
+
+
+# ============ END BROADCAST VIEW OPERATIONS SECTION =============
 
 
 # ============== KEY-VALUE OPERATIONS SECTION ==============
@@ -188,9 +236,6 @@ def delete_kvs(key):
     return jsonify({"result": "deleted", "causal-metadata": VECTOR_CLOCK}), 200
 
 # ============ END KEY-VALUE OPERATIONS SECTION =============
-
-#! =============== FOR TESTING PURPOSE ======================
-#! =============== END TESTING PURPOSE ======================
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8090, debug=True)
