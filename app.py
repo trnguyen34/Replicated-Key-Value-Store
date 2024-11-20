@@ -82,7 +82,7 @@ def broadcast_delete_replica(socket_address):
     for replica_addr in VIEW:
         if replica_addr != SOCKET_ADDRESS:
             url = f"http://{replica_addr}/viewed"
-            json_data = {"socket-address": new_socket_address}
+            json_data = {"socket-address": socket_address}
 
             # Retry until an ack is received
             # while True:
