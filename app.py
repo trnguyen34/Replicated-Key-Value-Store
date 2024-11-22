@@ -46,6 +46,23 @@ def is_causal_consistency(client_vc, replica_vc):
         
     return True
 
+def is_causal_delivery(client_ip, client_vc, replica_vc):
+    if client_ip not in replica_vc:
+        return False
+    
+    if client_vc[client_ip] != (replica_vc[client_ip] + 1):
+        return False
+    
+    for client_key in client_vc:
+        if client_key not in replica_vc:
+            return False
+
+        if client_key != client_ip:
+            if client_vc[client_key] > replica_vc[client_key]:
+                return False
+
+    return True
+
 def add_new_replica(new_socket_address):
     # Add the new replica's socket address to the VIEW
     VIEW.add(new_socket_address)
