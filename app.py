@@ -166,7 +166,7 @@ def delete_replica():
 # ============== END VIEW OPERATIONS SECTION ===============
 
 
-# ============== BROADCAST VIEW OPERATIONS SECTION ===============
+# ============== VIEW OPERATIONS RECEIVED FROM BROADCAST SECTION ===============
 
 @app.route('/viewed', methods=['PUT'])
 def put_replica_from_broadcast():
@@ -200,7 +200,7 @@ def delete_replica_from_broadcast():
     return jsonify({"result": "deleted"}), 200
 
 
-# ============ END BROADCAST VIEW OPERATIONS SECTION =============
+# ============ END VIEW OPERATIONS RECEIVED FROM BROADCAST SECTION =============
 
 
 # ============== KEY-VALUE OPERATIONS SECTION ==============
@@ -264,6 +264,51 @@ def delete_kvs(key):
     return jsonify({"result": "deleted", "causal-metadata": VECTOR_CLOCK}), 200
 
 # ============ END KEY-VALUE OPERATIONS SECTION =============
+
+
+# ============ KEY-VALUE OPERATION  RECEIVED FROM BROADCAST SECTION =============
+
+@app.route('/replica/kvs/<key>/<client_ip>', methods=['PUT'])
+def put_kvs_from_broadcst(key, client_ip):
+    data = request.get_json()
+    client_vc = data.get('causal-metadata')
+
+    if is_causal_delivery(client_ip, client_vc, VECTOR_CLOCK) is False:
+        return jsonify({"error": "Causal dependencies not satisfied; try again later"}), 503
+
+    VECTOR_CLOCK[client_ip] += 1
+
+    if 'value' not in data:
+        return jsonify({"error": "PUT request does not specify a value"}), 400
+
+    if len(key) > 50:
+        return jsonify({"error": "Key is too long"}), 400
+
+    value = data['value']
+    if key in KV_STORAGE:
+        KV_STORAGE[key] = value
+        return jsonify({"result": "replaced", "causal-metadata": VECTOR_CLOCK}), 200
+    else:
+        KV_STORAGE[key] = value
+        return jsonify({"result": "created", "causal-metadata": VECTOR_CLOCK}), 201
+
+@app.route('/replica/kvs/<key>/<client_ip>', methods=['DELETE'])
+def delete_kvs_from_broadcst(key, client_ip):
+    data = request.get_json()
+    client_vc = data.get('causal-metadata')
+
+    if is_causal_delivery(client_ip, client_vc, VECTOR_CLOCK) is False:
+        return jsonify({"error": "Causal dependencies not satisfied; try again later"}), 503
+
+    VECTOR_CLOCK[client_ip] += 1
+
+    if key not in KV_STORAGE:
+        return jsonify({"error": "Key does not exist"}), 404
+
+    del KV_STORAGE[key]
+    return jsonify({"result": "deleted", "causal-metadata": VECTOR_CLOCK}), 200
+
+# ============ END KEY-VALUE OPERATION  RECEIVED FROM BROADCAST SECTION =============
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8090, debug=True)
