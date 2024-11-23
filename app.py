@@ -137,7 +137,7 @@ def broadcast_put_kvs(key, value):
                 print(f"Retrying to notify {replica_addr} to put kvs {key}: {value}...", flush=True)
                 time.sleep(1)
 
-def broadcast_delete_replica(key, value):
+def broadcast_delete_kvs(key):
     for replica_addr in VIEW:
         if replica_addr != SOCKET_ADDRESS:
             url = f"http://{replica_addr}/replica/kvs/{key}/{SOCKET_ADDRESS}"
@@ -259,10 +259,11 @@ def put_kvs(key):
     if len(key) > 50:
         return jsonify({"error": "Key is too long"}), 400
 
-    if client_vc is None:
-        VECTOR_CLOCK[SOCKET_ADDRESS] += 1
+    VECTOR_CLOCK[SOCKET_ADDRESS] += 1
 
     value = data['value']
+    broadcast_put_kvs(key, value)
+
     if key in KV_STORAGE:
         KV_STORAGE[key] = value
         return jsonify({"result": "replaced", "causal-metadata": VECTOR_CLOCK}), 200
@@ -300,6 +301,8 @@ def delete_kvs(key):
     del KV_STORAGE[key]    
     # Increment the current replica's vc
     VECTOR_CLOCK[SOCKET_ADDRESS] += 1
+
+    broadcast_delete_kvs(key)
 
     return jsonify({"result": "deleted", "causal-metadata": VECTOR_CLOCK}), 200
 
