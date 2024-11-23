@@ -110,8 +110,8 @@ def broadcast_put_kvs(key, value):
             url = f"http://{replica_addr}/replica/kvs/{key}/{SOCKET_ADDRESS}"
             json_data = {"value": value, "causal-metadata": VECTOR_CLOCK}
             
-            retry = 0
-            while retry < 3:
+            num_retries = 0
+            while num_retries < 3:
                 try:
                     response = requests.put(url, json=json_data, timeout=1)
                     if response.status_code in (200, 201):
@@ -121,12 +121,12 @@ def broadcast_put_kvs(key, value):
                         print(f"Failed to notify {replica_addr} to put kvs {key}: {response.status_code}", flush=True)
                 except requests.exceptions.RequestException as e:
                     print(f"Error notifying {replica_addr} to put kvs {key}: {e}", flush=True)
+                    num_retries += 1
 
                 print(f"Retrying to notify {replica_addr} to put kvs {key}: {value}...", flush=True)
-                retry += 1
                 time.sleep(1)
             
-            if retry == 3:
+            if num_retries == 3:
                 non_response_replicas.append(replica_addr)
     
     for replica_addr in non_response_replicas:
@@ -141,8 +141,8 @@ def broadcast_delete_kvs(key):
             url = f"http://{replica_addr}/replica/kvs/{key}/{SOCKET_ADDRESS}"
             json_data = {"value": value, "causal-metadata": VECTOR_CLOCK}
 
-        retry = 0
-        while retry < 3:
+        num_retries = 0
+        while num_retries < 3:
             try:
                 response = requests.delete(url, json=json_data, timeout=1)
                 if response.status_code in (200, 404):
@@ -152,12 +152,12 @@ def broadcast_delete_kvs(key):
                     print(f"Failed to notify {replica_addr} to delete kvs {key}: {response.status_code}", flush=True)
             except requests.exceptions.RequestException as e:
                 print(f"Error notifying {replica_addr} to delete kvs {key}: {e}", flush=True)
+                num_retries += 1
 
             print(f"Retrying to notify {replica_addr} to delete kvs {key}: {value}...", flush=True)
-            retry += 1
             time.sleep(1)
         
-        if retry == 3:
+        if num_retries == 3:
             non_response_replicas.append(replica_addr)
     
     for replica_addr in non_response_replicas:
