@@ -113,7 +113,7 @@ def broadcast_put_kvs(key, value):
             retry = 0
             while retry < 3:
                 try:
-                    response = requests.put(url, json=json_data, timeout=0.5)
+                    response = requests.put(url, json=json_data, timeout=1)
                     if response.status_code in (200, 201):
                         print(f"Successfully notified {replica_addr} to put kvs {key}: {value}", flush=True)
                         break
@@ -144,7 +144,7 @@ def broadcast_delete_kvs(key):
         retry = 0
         while retry < 3:
             try:
-                response = requests.delete(url, json=json_data, timeout=0.5)
+                response = requests.delete(url, json=json_data, timeout=1)
                 if response.status_code in (200, 404):
                     print(f"Successfully notified {replica_addr} to delete kvs {key}: {value}", flush=True)
                     break
@@ -172,7 +172,7 @@ def request_vc_n_kvs():
         if replica_addr != SOCKET_ADDRESS:
             url = f"http://{replica_addr}/info"
             try:
-                response = requests.get(url, timeout=0.5)
+                response = requests.get(url, timeout=1)
                 if response.status_code == 200:
                     data = response.json()
                     VECTOR_CLOCK = data.get('vc')
@@ -405,7 +405,6 @@ broadcast_put_replica(SOCKET_ADDRESS)
 request_vc_n_kvs()
 
 # ================= End Initialization ====================
-
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8090, debug=True)
