@@ -90,7 +90,7 @@ def broadcast_delete_replica(socket_address):
             # while True:
             try:
                 response = requests.delete(url, json=json_data, timeout=1)
-                if response.status_code in (200, 201):
+                if response.status_code in (200, 401):
                     # break
                     continue
                 else:
