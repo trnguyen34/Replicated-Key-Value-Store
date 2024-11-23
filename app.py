@@ -17,21 +17,6 @@ VIEW = set()
 # A dictionary to store vector clocks
 VECTOR_CLOCK = {}
 
-# ==================== Replica View and Vector Clock Initialization ====================
-
-# Add the current replica's address 
-VIEW.add(SOCKET_ADDRESS)
-
-# Add all addresses from the VIEW_ADDRESS 
-for addr in VIEW_ADDRESS.split(','):
-    VIEW.add(addr)
-
-# Initialize VECTOR_CLOCK
-for replica in VIEW:
-    VECTOR_CLOCK[replica] = 0
-    
-# ================= End of Replica View and Vector Clock Initialization ================
-
 # ==================== Utility Functions ====================
 
 # Ensure that the client's vc is less or equal to the to 
@@ -81,7 +66,7 @@ def broadcast_put_replica(new_socket_address):
             # Retry until an ack is received
             # while True:
             try:
-                response = requests.put(url, json=json_data, timeout=1.5)
+                response = requests.put(url, json=json_data, timeout=1)
                 if response.status_code in (200, 201):
                     # print(f"Successfully notified {replica_addr} of new replica {new_socket_address}", flush=True)
                     # break
@@ -104,8 +89,8 @@ def broadcast_delete_replica(socket_address):
             # Retry until an ack is received
             # while True:
             try:
-                response = requests.delete(url, json=json_data, timeout=1.5)
-                if response.status_code in (200, 404):
+                response = requests.delete(url, json=json_data, timeout=1)
+                if response.status_code in (200, 201):
                     # break
                     continue
                 else:
@@ -118,14 +103,17 @@ def broadcast_delete_replica(socket_address):
             # time.sleep(1)
 
 def broadcast_put_kvs(key, value):
+    non_response_replicas = []
+
     for replica_addr in VIEW:
         if replica_addr != SOCKET_ADDRESS:
             url = f"http://{replica_addr}/replica/kvs/{key}/{SOCKET_ADDRESS}"
             json_data = {"value": value, "causal-metadata": VECTOR_CLOCK}
             
-            while True:
+            retry = 0
+            while retry < 3:
                 try:
-                    response = requests.put(url, json=json_data, timeout=1.5)
+                    response = requests.put(url, json=json_data, timeout=0.5)
                     if response.status_code in (200, 201):
                         print(f"Successfully notified {replica_addr} to put kvs {key}: {value}", flush=True)
                         break
@@ -135,17 +123,28 @@ def broadcast_put_kvs(key, value):
                     print(f"Error notifying {replica_addr} to put kvs {key}: {e}", flush=True)
 
                 print(f"Retrying to notify {replica_addr} to put kvs {key}: {value}...", flush=True)
+                retry += 1
                 time.sleep(1)
+            
+            if retry == 3:
+                non_response_replicas.append(replica_addr)
+    
+    for replica_addr in non_response_replicas:
+        VIEW.remove(replica_addr)
+        broadcast_delete_replica(replica_addr)
 
 def broadcast_delete_kvs(key):
+    non_response_replicas = []
+
     for replica_addr in VIEW:
         if replica_addr != SOCKET_ADDRESS:
             url = f"http://{replica_addr}/replica/kvs/{key}/{SOCKET_ADDRESS}"
             json_data = {"value": value, "causal-metadata": VECTOR_CLOCK}
 
-        while True:
+        retry = 0
+        while retry < 3:
             try:
-                response = requests.delete(url, json=json_data, timeout=1.5)
+                response = requests.delete(url, json=json_data, timeout=0.5)
                 if response.status_code in (200, 404):
                     print(f"Successfully notified {replica_addr} to delete kvs {key}: {value}", flush=True)
                     break
@@ -155,9 +154,43 @@ def broadcast_delete_kvs(key):
                 print(f"Error notifying {replica_addr} to delete kvs {key}: {e}", flush=True)
 
             print(f"Retrying to notify {replica_addr} to delete kvs {key}: {value}...", flush=True)
+            retry += 1
             time.sleep(1)
+        
+        if retry == 3:
+            non_response_replicas.append(replica_addr)
+    
+    for replica_addr in non_response_replicas:
+        VIEW.remove(replica_addr)
+        broadcast_delete_replica(replica_addr)
                 
+def request_vc_n_kvs():
+    global VECTOR_CLOCK
+    global KV_STORAGE
+
+    for replica_addr in VIEW:
+        if replica_addr != SOCKET_ADDRESS:
+            url = f"http://{replica_addr}/info"
+            try:
+                response = requests.get(url, timeout=0.5)
+                if response.status_code == 200:
+                    data = response.json()
+                    VECTOR_CLOCK = data.get('vc')
+                    KV_STORAGE = data.get('kvs')
+                    return 
+            except requests.exceptions.RequestException as e:
+                print(f"Error requesting info from {replica_addr}: {e}", flush=True)
+                continue
 # ================== End Utility Functions ==================
+
+
+# ================= REQUEST KVSTORAGE AND VECTORCLOCK SECTION =================
+
+@app.route('/info', methods=['GET'])
+def get_info():
+    return jsonify({'vc': VECTOR_CLOCK, 'kvs': KV_STORAGE}), 200
+
+# ================= END REQUEST KVSTORAGE AND VECTORCLOCK SECTION =================
 
 
 # ============== VIEW OPERATIONS SECTION =============
@@ -309,7 +342,7 @@ def delete_kvs(key):
 # ============ END KEY-VALUE OPERATIONS SECTION =============
 
 
-# ============ KEY-VALUE OPERATION  RECEIVED FROM BROADCAST SECTION =============
+# ============ KEY-VALUE OPERATION RECEIVED FROM BROADCAST SECTION =============
 
 @app.route('/replica/kvs/<key>/<client_ip>', methods=['PUT'])
 def put_kvs_from_broadcst(key, client_ip):
@@ -351,7 +384,28 @@ def delete_kvs_from_broadcst(key, client_ip):
     del KV_STORAGE[key]
     return jsonify({"result": "deleted", "causal-metadata": VECTOR_CLOCK}), 200
 
-# ============ END KEY-VALUE OPERATION  RECEIVED FROM BROADCAST SECTION =============
+# ============ END KEY-VALUE OPERATION RECEIVED FROM BROADCAST SECTION =============
+
+
+# ==================== Initialization ====================
+
+# Add the current replica's address 
+VIEW.add(SOCKET_ADDRESS)
+
+# Add all addresses from the VIEW_ADDRESS 
+for addr in VIEW_ADDRESS.split(','):
+    VIEW.add(addr)
+
+# Initialize VECTOR_CLOCK
+for replica in VIEW:
+    VECTOR_CLOCK[replica] = 0
+
+broadcast_put_replica(SOCKET_ADDRESS)
+
+request_vc_n_kvs()
+
+# ================= End Initialization ====================
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8090, debug=True)
