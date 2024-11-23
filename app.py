@@ -116,6 +116,46 @@ def broadcast_delete_replica(socket_address):
             # Sleep for 1 second before retrying
             # print(f"Retrying to notify {replica_addr} to delete replica {socket_address}...", flush=True)
             # time.sleep(1)
+
+def broadcast_put_kvs(key, value):
+    for replica_addr in VIEW:
+        if replica_addr != SOCKET_ADDRESS:
+            url = f"http://{replica_addr}/replica/kvs/{key}/{SOCKET_ADDRESS}"
+            json_data = {"value": value, "causal-metadata": VECTOR_CLOCK}
+            
+            while True:
+                try:
+                    response = requests.put(url, json=json_data, timeout=1.5)
+                    if response.status_code in (200, 201):
+                        print(f"Successfully notified {replica_addr} to put kvs {key}: {value}", flush=True)
+                        break
+                    else:
+                        print(f"Failed to notify {replica_addr} to put kvs {key}: {response.status_code}", flush=True)
+                except requests.exceptions.RequestException as e:
+                    print(f"Error notifying {replica_addr} to put kvs {key}: {e}", flush=True)
+
+                print(f"Retrying to notify {replica_addr} to put kvs {key}: {value}...", flush=True)
+                time.sleep(1)
+
+def broadcast_delete_replica(key, value):
+    for replica_addr in VIEW:
+        if replica_addr != SOCKET_ADDRESS:
+            url = f"http://{replica_addr}/replica/kvs/{key}/{SOCKET_ADDRESS}"
+            json_data = {"value": value, "causal-metadata": VECTOR_CLOCK}
+
+        while True:
+            try:
+                response = requests.delete(url, json=json_data, timeout=1.5)
+                if response.status_code in (200, 404):
+                    print(f"Successfully notified {replica_addr} to delete kvs {key}: {value}", flush=True)
+                    break
+                else:
+                    print(f"Failed to notify {replica_addr} to delete kvs {key}: {response.status_code}", flush=True)
+            except requests.exceptions.RequestException as e:
+                print(f"Error notifying {replica_addr} to delete kvs {key}: {e}", flush=True)
+
+            print(f"Retrying to notify {replica_addr} to delete kvs {key}: {value}...", flush=True)
+            time.sleep(1)
                 
 # ================== End Utility Functions ==================
 
