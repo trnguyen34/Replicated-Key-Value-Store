@@ -63,22 +63,14 @@ def broadcast_put_replica(new_socket_address):
             url = f"http://{replica_addr}/viewed"
             json_data = {"socket-address": new_socket_address}
 
-            # Retry until an ack is received
-            # while True:
             try:
                 response = requests.put(url, json=json_data, timeout=1)
                 if response.status_code in (200, 201):
-                    # print(f"Successfully notified {replica_addr} of new replica {new_socket_address}", flush=True)
-                    # break
-                    continue
+                    print(f"Successfully notified {replica_addr} of new replica {new_socket_address}", flush=True)
                 else:
                     print(f"Failed to notify {replica_addr}: {response.status_code}", flush=True)
             except requests.exceptions.RequestException as e:
                 print(f"Error notifying {replica_addr}: {e}", flush=True)
-
-            # Sleep for 1 second before retrying
-            # print(f"Retrying to notify {replica_addr} of new replica {new_socket_address}...", flush=True)
-            # time.sleep(1)
 
 def broadcast_delete_replica(socket_address):
     for replica_addr in VIEW:
@@ -86,8 +78,6 @@ def broadcast_delete_replica(socket_address):
             url = f"http://{replica_addr}/viewed"
             json_data = {"socket-address": socket_address}
 
-            # Retry until an ack is received
-            # while True:
             try:
                 response = requests.delete(url, json=json_data, timeout=1)
                 if response.status_code in (200, 401):
@@ -98,9 +88,6 @@ def broadcast_delete_replica(socket_address):
             except requests.exceptions.RequestException as e:
                 print(f"Error notifying {replica_addr} to delete replica: {e}", flush=True)
                 
-            # Sleep for 1 second before retrying
-            # print(f"Retrying to notify {replica_addr} to delete replica {socket_address}...", flush=True)
-            # time.sleep(1)
 
 def broadcast_put_kvs(key, value):
     non_response_replicas = []
@@ -123,7 +110,7 @@ def broadcast_put_kvs(key, value):
                     print(f"Error notifying {replica_addr} to put kvs {key}: {e}", flush=True)
                     num_retries += 1
 
-                print(f"Retrying to notify {replica_addr} to put kvs {key}: {value}...", flush=True)
+                print(f"Retrying to notify {replica_addr} to put kvs {key}: {value}", flush=True)
                 time.sleep(1)
             
             if num_retries == 3:
@@ -154,7 +141,7 @@ def broadcast_delete_kvs(key):
                 print(f"Error notifying {replica_addr} to delete kvs {key}: {e}", flush=True)
                 num_retries += 1
 
-            print(f"Retrying to notify {replica_addr} to delete kvs {key}: {value}...", flush=True)
+            print(f"Retrying to notify {replica_addr} to delete kvs {key}: {value}", flush=True)
             time.sleep(1)
         
         if num_retries == 3:
@@ -170,7 +157,7 @@ def request_vc_n_kvs():
 
     for replica_addr in VIEW:
         if replica_addr != SOCKET_ADDRESS:
-            url = f"http://{replica_addr}/info"
+            url = f"http://{replica_addr}/vckvs"
             try:
                 response = requests.get(url, timeout=1)
                 if response.status_code == 200:
@@ -179,18 +166,18 @@ def request_vc_n_kvs():
                     KV_STORAGE = data.get('kvs')
                     return 
             except requests.exceptions.RequestException as e:
-                print(f"Error requesting info from {replica_addr}: {e}", flush=True)
+                print(f"Error requesting vc and kvs from {replica_addr}: {e}", flush=True)
                 continue
 # ================== End Utility Functions ==================
 
 
-# ================= REQUEST KVSTORAGE AND VECTORCLOCK SECTION =================
+# ================= REQUEST VECTORCLOCK AND KVS SECTION =================
 
-@app.route('/info', methods=['GET'])
-def get_info():
+@app.route('/vckvs', methods=['GET'])
+def get_vc_n_kvs():
     return jsonify({'vc': VECTOR_CLOCK, 'kvs': KV_STORAGE}), 200
 
-# ================= END REQUEST KVSTORAGE AND VECTORCLOCK SECTION =================
+# ================= REQUEST VECTORCLOCK AND KVS SECTION =================
 
 
 # ============== VIEW OPERATIONS SECTION =============
