@@ -1,4 +1,11 @@
-# CSE138_Assignment3
+# CSE138_Assignment3 Replicated Key-Value Store
+
+### Team
+| Name | CruzID |
+|------|--------|
+| Truong Nguyen | |
+| Roy Chan | 2002530 |
+| Yefeng Zheng | |
 
 ## Mechanisms
 ### Detecting Downed Replicas 
