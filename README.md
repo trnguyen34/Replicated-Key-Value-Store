@@ -1,7 +1,7 @@
 # CSE138_Assignment3
 
 ## Mechanisms
-### Detectubng Downed Replicas 
+### Detecting Downed Replicas 
 The system uses a retry mechanism to detect when a replica goes down. When a PUT or DELETE is initiated, the replica broadcasts the new update to  all other replicas in the VIEW. Each request is retied up to three times in case of failure, with a 1 second delay between retires, to account for network issues. IF a replica does not repond adter three retires, it is considered to be down and removed from the replica's VIEW. Then the replica notfy all renmaining replicas to remove the unreponsive replica. 
 
 ### Tracking Causal Dependencies
