@@ -3,25 +3,18 @@ import requests, os, time
 
 app = Flask(__name__)
 
-# Corresponds to the current Replica IP address
+
 SOCKET_ADDRESS = os.environ.get('SOCKET_ADDRESS')
-# The socket address of the replicas participating the key-value store
-VIEW_ADDRESS = os.environ.get('VIEW')
-
-# A dictionary to store key-value pairs 
-KV_STORAGE = {}
-
-# A set to store the addresses of replicas in the view
-VIEW = set()
-
-# A dictionary to store vector clocks
+VIEW_ADDRESS = os.environ.get('VIEW') # The socket address of the replicas participating the key-value store
+KV_STORAGE = {} # A dictionary to store key-value pairs 
+VIEW = set() # A set to store the addresses of replicas in the view
 VECTOR_CLOCK = {}
 
 # ==================== Utility Functions ====================
 
-# Ensure that the client's vc is less or equal to the to 
-# replica's vc. 
 def is_causal_consistency(client_vc, replica_vc):
+    # Checks if the client's vector clock is less than or equal to the replica's vector clock
+    # for all entries, ensuring causal consistency before processing the client's request.
     for client_key in client_vc:
         if client_key not in replica_vc:
             return False
@@ -32,6 +25,8 @@ def is_causal_consistency(client_vc, replica_vc):
     return True
 
 def is_causal_delivery(client_ip, client_vc, replica_vc):
+    # Determines if a message from a client can be delivered based on causal delivery rules.
+    # It checks that the client's vector clock is the next expected version and that all dependencies are met.
     if client_ip not in replica_vc:
         return False
     
@@ -49,15 +44,13 @@ def is_causal_delivery(client_ip, client_vc, replica_vc):
     return True
 
 def add_new_replica(new_socket_address):
-    # Add the new replica's socket address to the VIEW
     VIEW.add(new_socket_address)
-
-    # Initialize the new replica's vector clock entry to 0.
     VECTOR_CLOCK[new_socket_address] = 0
 
     print(f"Added replica {new_socket_address} to VIEW and initialized VECTOR_CLOCK.", flush=True)
 
 def broadcast_put_replica(new_socket_address):
+    # Sends a PUT request to all other replicas to notify them about the addition of a new replica.
     for replica_addr in VIEW:
         if replica_addr != SOCKET_ADDRESS:
             url = f"http://{replica_addr}/viewed"
@@ -81,7 +74,6 @@ def broadcast_delete_replica(socket_address):
             try:
                 response = requests.delete(url, json=json_data, timeout=1)
                 if response.status_code in (200, 401):
-                    # break
                     continue
                 else:
                     print(f"Failed to notify {replica_addr} to delete replica: {response.status_code}", flush=True)
@@ -121,6 +113,8 @@ def broadcast_put_kvs(key, value):
         broadcast_delete_replica(replica_addr)
 
 def broadcast_delete_kvs(key):
+    # Broadcasts a DELETE operation for a key to all other replicas,
+    # ensuring the deletion is propagated throughout the system. Retries up to three times if necessary.
     non_response_replicas = []
 
     for replica_addr in VIEW:
@@ -152,6 +146,8 @@ def broadcast_delete_kvs(key):
         broadcast_delete_replica(replica_addr)
                 
 def request_vc_n_kvs():
+    # Attempts to synchronize the local VECTOR_CLOCK and KV_STORAGE with another replica,
+    # useful when a new replica joins and needs to be in its current state.
     global VECTOR_CLOCK
     global KV_STORAGE
 
@@ -184,12 +180,9 @@ def get_vc_n_kvs():
 
 @app.route('/view', methods=['PUT'])
 def put_replica():
-    # Retrieve JSON data from the request
     data = request.get_json()
-    # Extract the socket address of the new replica
     new_socket_address = data.get('socket-address')
-
-    # Check if the replica is already in the view
+    
     if new_socket_address in VIEW:
         return jsonify({"result": "already present"}), 200
 
@@ -201,22 +194,16 @@ def put_replica():
 
 @app.route('/view', methods=['GET'])
 def get_replicas():
-    # Return the current VIEW as a list
     return jsonify({"view": list(VIEW)}), 200
 
 @app.route('/view', methods=['DELETE'])
 def delete_replica():
-    # Retrieve JSON data from the request
     data = request.get_json()
-    # Extract the socket address of the replica to be removed
     socket_address = data.get('socket-address')
 
-     # Check if the replica is in the view
     if socket_address not in VIEW:
-         # If not present, respond with an error
         return jsonify({"error": "View has no such replica"}), 404
     
-    # If present, remove the replica from the view
     VIEW.remove(socket_address)
 
     broadcast_delete_replica(socket_address)
@@ -230,12 +217,9 @@ def delete_replica():
 
 @app.route('/viewed', methods=['PUT'])
 def put_replica_from_broadcast():
-    # Retrieve JSON data from the request
     data = request.get_json()
-    # Extract the socket address of the new replica
     new_socket_address = data.get('socket-address')
 
-    # Check if the replica is already in the view
     if new_socket_address in VIEW:
         return jsonify({"result": "already present"}), 200
 
@@ -245,17 +229,12 @@ def put_replica_from_broadcast():
 
 @app.route('/viewed', methods=['DELETE'])
 def delete_replica_from_broadcast():
-    # Retrieve JSON data from the request
     data = request.get_json()
-    # Extract the socket address of the new replica
     socket_address = data.get('socket-address')
 
-    # Check if the replica is in the view
     if socket_address not in VIEW:
-         # If not present, respond with an error
         return jsonify({"error": "View has no such replica"}), 404
 
-    # If present, remove the replica from the view
     VIEW.remove(socket_address)
     return jsonify({"result": "deleted"}), 200
 
@@ -311,7 +290,6 @@ def delete_kvs(key):
     data = request.get_json()
     client_vc = data.get('causal-metadata')
 
-    # The client's vc is NULL or causal consistency has not been met.
     if client_vc is None or is_causal_consistency(client_vc, VECTOR_CLOCK) is False:
         return jsonify({"error": "Causal dependencies not satisfied; try again later"}), 503
 
@@ -319,7 +297,6 @@ def delete_kvs(key):
         return jsonify({"error": "Key does not exist"}), 404
 
     del KV_STORAGE[key]    
-    # Increment the current replica's vc
     VECTOR_CLOCK[SOCKET_ADDRESS] += 1
 
     broadcast_delete_kvs(key)
@@ -379,11 +356,9 @@ def delete_kvs_from_broadcst(key, client_ip):
 # Add the current replica's address 
 VIEW.add(SOCKET_ADDRESS)
 
-# Add all addresses from the VIEW_ADDRESS 
 for addr in VIEW_ADDRESS.split(','):
     VIEW.add(addr)
 
-# Initialize VECTOR_CLOCK
 for replica in VIEW:
     VECTOR_CLOCK[replica] = 0
 
