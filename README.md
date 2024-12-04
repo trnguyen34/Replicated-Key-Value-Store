@@ -1,7 +1,7 @@
 # CSE138_Assignment3 Replicated Key-Value Store
 | Name | CruzID | Contribution | 
 |------|--------|--------------|
-| Truong Nguyen | | Overall Code Logic implementation |
+| Truong Nguyen | 1701485 | Overall Code Logic implementation |
 | Roy Chan | 2002530 | Testing & Documentation |
 | Yefeng Zheng | | |
 
