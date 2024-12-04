@@ -7,7 +7,7 @@ app = Flask(__name__)
 SOCKET_ADDRESS = os.environ.get('SOCKET_ADDRESS')
 VIEW_ADDRESS = os.environ.get('VIEW') # The socket address of the replicas participating the key-value store
 KV_STORAGE = {} # A dictionary to store key-value pairs 
-VIEW = set() # A set to store the addresses of replicas in the view
+VIEW = set() # A set to store the addresses of replicas 
 VECTOR_CLOCK = {}
 
 # ==================== Utility Functions ====================
@@ -73,8 +73,8 @@ def broadcast_delete_replica(socket_address):
 
             try:
                 response = requests.delete(url, json=json_data, timeout=1)
-                if response.status_code in (200, 401):
-                    continue
+                if response.status_code in (200, 404):
+                    print(f"Successfully notified {replica_addr} of delete replica {socket_address}", flush=True)
                 else:
                     print(f"Failed to notify {replica_addr} to delete replica: {response.status_code}", flush=True)
             except requests.exceptions.RequestException as e:
@@ -163,7 +163,7 @@ def request_vc_n_kvs():
                     return 
             except requests.exceptions.RequestException as e:
                 print(f"Error requesting vc and kvs from {replica_addr}: {e}", flush=True)
-                continue
+
 # ================== End Utility Functions ==================
 
 
