@@ -17,3 +17,4 @@ The system tracks causal dependencies using a vector clock mechanism. Each repli
 - [Causal broadcast for put and delete kvs](https://www.youtube.com/watch?v=buBGyECx69c&list=PLNPUF5QyWU8PydLG2cIJrCvnn5I_exhYx&index=5&t=1318s)
 - [Eventual consistency (a liverness property)](https://www.youtube.com/watch?v=InctqJZwCdo&list=PLNPUF5QyWU8PydLG2cIJrCvnn5I_exhYx&index=13&t=391s)
 - [Vector Clocks in Distributed Systems](https://www.geeksforgeeks.org/vector-clocks-in-distributed-systems/#)
+- [Request Timeout](https://requests.readthedocs.io/en/latest/user/advanced/#timeouts)
