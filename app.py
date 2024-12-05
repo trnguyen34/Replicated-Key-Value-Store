@@ -290,7 +290,7 @@ def delete_kvs(key):
     data = request.get_json()
     client_vc = data.get('causal-metadata')
 
-    if client_vc is None or is_causal_consistency(client_vc, VECTOR_CLOCK) is False:
+    if client_vc is not None and is_causal_consistency(client_vc, VECTOR_CLOCK) is False:
         return jsonify({"error": "Causal dependencies not satisfied; try again later"}), 503
 
     if key not in KV_STORAGE:
