@@ -357,10 +357,7 @@ def delete_kvs_from_broadcst(key, client_ip):
 VIEW.add(SOCKET_ADDRESS)
 
 for addr in VIEW_ADDRESS.split(','):
-    VIEW.add(addr)
-
-for replica in VIEW:
-    VECTOR_CLOCK[replica] = 0
+    add_new_replica(addr)
 
 broadcast_put_replica(SOCKET_ADDRESS)
 
