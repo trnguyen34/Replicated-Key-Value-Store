@@ -1,10 +1,4 @@
-# CSE138_Assignment3 Replicated Key-Value Store
-| Name | CruzID | Contribution | 
-|------|--------|--------------|
-| Truong Nguyen | 1701485 | Overall Code Logic implementation |
-| Roy Chan | 2002530 | Testing & Documentation |
-| Yefeng Zheng | | |
-
+# Replicated Key-Value Store
 ## Mechanisms
 ### Detecting Downed Replicas 
 The system uses a retry mechanism to detect when a replica goes down. When a PUT or DELETE is initiated, the replica broadcasts the new update to  all other replicas in the VIEW. Each request is retried up to three times in case of failure, with a 1-second delay between retires, to account for network issues. If a replica does not respond after three retires, it is considered to be down and removed from the replica's VIEW. Then the replica notifies all remaining replicas to remove the unresponsive replica. 
